@@ -442,6 +442,12 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             ComboItem.Items.Add("相機");
             ComboItem.Items.Add("手提包");
+
+            ComboCountry.SelectedIndex = 0;
+            ComboItem.SelectedIndex = 0;
+            ComboForeground.SelectedIndex = 0;
+            ComboCloth.SelectedIndex = 0;
+
         }
 
         private void CountrySelectChanged()
