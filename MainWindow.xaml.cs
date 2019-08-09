@@ -445,14 +445,10 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             ComboCountry.SelectedIndex = 0;
             ComboItem.SelectedIndex = 0;
-            ComboForeground.SelectedIndex = 0;
-            ComboCloth.SelectedIndex = 0;
-
         }
 
         private void CountrySelectChanged()
         {
-            ComboItem.SelectedIndex = 0;
             ComboForeground.SelectedIndex = 0;
             ComboCloth.SelectedIndex = 0;
 
