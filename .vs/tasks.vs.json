@@ -1,0 +1,15 @@
+{
+  "version": "0.2.1",
+  "tasks": [
+    {
+      "taskName": "task-america",
+      "appliesTo": "Images/america.jpg",
+      "type": "launch"
+    },
+    {
+      "taskName": "task-taiwan",
+      "appliesTo": "Images/taiwan.jpg",
+      "type": "launch"
+    }
+  ]
+}

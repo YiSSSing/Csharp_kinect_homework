@@ -47,11 +47,11 @@
 
         <Viewbox Grid.Row="1" HorizontalAlignment="Center">
             <Grid Name="CompositeImage" Width="25034" Height="15919">
-                <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-1875,0,-1885,0" />
                 <Image x:Name="BackgroundImage" Source="Images\Background.png" Stretch="UniformToFill" Grid.ColumnSpan="4" />
-                
-                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Margin="6628,12899,12799,573" Visibility="Hidden" />
-                <Image x:Name="Item_bag" Source="Images/item_bag.png" Margin="12430,13560,6561,676" Visibility="Hidden"/>
+                <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-56,0,10,0" />
+
+                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Margin="13000,13500,10000,800" Height="2000" Width="2000" Visibility="Visible" />
+                <Image x:Name="Item_bag" Source="Images/item_bag.png" Margin="9100,13225,13934,694" Height="2000" Width="2000" Visibility="Visible"/>
 
                 <Image x:Name="Foreground_eggcake" Margin="1087,6534,15584,121" Source="Images/eggcake.jpg" Visibility="Hidden" />
                 <Image x:Name="Foreground_torii" Source="Images/torii.png" Margin="7534,1914,-626,344" Visibility="Hidden" />

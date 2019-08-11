@@ -7,11 +7,13 @@
 namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 {
     using System;
+    using System.Collections.Generic;
     using System.ComponentModel;
-    using System.Diagnostics;
     using System.Globalization;
     using System.IO;
     using System.Windows;
+    using System.Windows.Controls;
+    using System.Windows.Input;
     using System.Windows.Media;
     using System.Windows.Media.Imaging;
     using Microsoft.Kinect;
@@ -21,12 +23,18 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        //global var here
+        private Image selectingItem = null, selectingForeground = null;
+        private BodyFrameReader bodyFrameReader = null;
+        private Body[] bodies;
+        private const float InferredZPositionClamp = 0.1f;
+
         /// <summary>
         /// Size of the RGB pixel in the bitmap
         /// </summary>
         private readonly int bytesPerPixel = (PixelFormats.Bgr32.BitsPerPixel + 7) / 8;
 
-        /// <summary>;'''''''''''''''''''''''''''''''''''''''''''''''''''''''
+        /// <summary>
         /// Active Kinect sensor
         /// </summary>
         private KinectSensor kinectSensor = null;
@@ -70,7 +78,11 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             this.multiFrameSourceReader = this.kinectSensor.OpenMultiSourceFrameReader(FrameSourceTypes.Depth | FrameSourceTypes.Color | FrameSourceTypes.BodyIndex);
 
+            //deal with coordinate mapping
             this.multiFrameSourceReader.MultiSourceFrameArrived += this.Reader_MultiSourceFrameArrived;
+
+            //deal with item on hand tracking
+            //this.bodyFrameReader.FrameArrived += this.Reader_FrameArrived;
 
             this.coordinateMapper = this.kinectSensor.CoordinateMapper;
 
@@ -103,6 +115,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             this.InitializeComponent();
 
             ComboBoxInitialize();
+
         }
 
         /// <summary>
@@ -215,7 +228,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
         /// </summary>
         /// <param name="sender">object sending the event</param>
         /// <param name="e">event arguments</param>
-        private void Reader_MultiSourceFrameArrived(object sender, MultiSourceFrameArrivedEventArgs e)
+        private void Reader_MultiSourceFrameArrived(object sender, MultiSourceFrameArrivedEventArgs e )
         {
             int depthWidth = 0;
             int depthHeight = 0;
@@ -223,7 +236,8 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             DepthFrame depthFrame = null;
             ColorFrame colorFrame = null;
             BodyIndexFrame bodyIndexFrame = null;
-            bool isBitmapLocked = false;
+            BodyFrame bodyFrame = null;
+            bool isBitmapLocked = false, bodyDataReceived = false;
 
             MultiSourceFrame multiSourceFrame = e.FrameReference.AcquireFrame();           
 
@@ -237,13 +251,15 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             // This includes calling Dispose on any Frame objects that we may have and unlocking the bitmap back buffer.
             try
             {                
+                //get the frame and prepare to do something
                 depthFrame = multiSourceFrame.DepthFrameReference.AcquireFrame();
                 colorFrame = multiSourceFrame.ColorFrameReference.AcquireFrame();
                 bodyIndexFrame = multiSourceFrame.BodyIndexFrameReference.AcquireFrame();
+                bodyFrame = multiSourceFrame.BodyFrameReference.AcquireFrame();
 
                 // If any frame has expired by the time we process this event, return.
                 // The "finally" statement will Dispose any that are not null.
-                if ((depthFrame == null) || (colorFrame == null) || (bodyIndexFrame == null))
+                if ((depthFrame == null) || (colorFrame == null) || (bodyIndexFrame == null) || (bodyFrame == null) )
                 {
                     return;
                 }
@@ -328,30 +344,109 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                         this.bitmap.AddDirtyRect(new Int32Rect(0, 0, this.bitmap.PixelWidth, this.bitmap.PixelHeight));
                     }
                 }
-            }
-            finally
+
+                //here is from body basic example
+                using (bodyFrame)
+                {
+                    if (bodyFrame != null)
+                    {
+                        if (this.bodies == null)
+                        {
+                            this.bodies = new Body[bodyFrame.BodyCount];
+                        }
+
+                        // The first time GetAndRefreshBodyData is called, Kinect will allocate each Body in the array.
+                        // As long as those body objects are not disposed and not set to null in the array,
+                        // those body objects will be re-used.
+                        bodyFrame.GetAndRefreshBodyData(this.bodies);
+                        bodyDataReceived = true;
+                    }
+                }
+
+                if (bodyDataReceived)
+                { 
+
+                    foreach (Body body in this.bodies)
+                    {
+
+                        if (body.IsTracked)
+                        {
+                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+
+                            // convert the joint points to depth (display) space
+                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+
+                            foreach (JointType jointType in joints.Keys)
+                            {
+                                // sometimes the depth(Z) of an inferred joint may show as negative
+                                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                                CameraSpacePoint position = joints[jointType].Position;
+                                if (position.Z < 0)
+                                {
+                                    position.Z = InferredZPositionClamp;
+                                }
+
+                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                            }
+
+                            this.DrawItemOnHand(body.HandRightState, jointPoints[JointType.HandRight]);
+                        }
+                    }
+                }
+
+                //done with body frame
+                bodyFrame.Dispose();
+                bodyFrame = null;
+
+            }catch ( Exception )
             {
-                if (isBitmapLocked)
-                {
-                    this.bitmap.Unlock();
-                }
+                //nothing here
+            }finally
+            {
+                if (isBitmapLocked) this.bitmap.Unlock();
+                if (depthFrame != null) depthFrame.Dispose();
+                if (colorFrame != null) colorFrame.Dispose();
+                if (bodyIndexFrame != null) bodyIndexFrame.Dispose();
+                if ( bodyFrame != null ) bodyFrame.Dispose();
+            }
 
-                if (depthFrame != null)
-                {
-                    depthFrame.Dispose();
-                }
+        }
 
-                if (colorFrame != null)
+        /// <summary>
+        /// bind items to player's right hand
+        /// </summary>
+        /// <param name="hs">hand state for kinect</param>
+        /// <param name="handPosition">hand position</param>
+        private void DrawItemOnHand(HandState hs , Point handPosition)
+        {
+            if (hs != HandState.NotTracked)
+            {
+                double right = 23000 - handPosition.X, bottom = 14000 - handPosition.Y;
+                if (handPosition.X < 0)
                 {
-                    colorFrame.Dispose();
+                    handPosition.X = 0;
+                    right = 23000;
                 }
-
-                if (bodyIndexFrame != null)
+                if (handPosition.Y < 0)
                 {
-                    bodyIndexFrame.Dispose();
+                    handPosition.Y = 0;
+                    bottom = 14000;
                 }
+                if (23000 < handPosition.X)
+                {
+                    handPosition.X = 23000;
+                    right = 0;
+                }
+                if (14000 < handPosition.Y)
+                {
+                    bottom = 0;
+                    handPosition.Y = 14000;
+                }
+                Item_photographer.Margin = new Thickness(handPosition.X, handPosition.Y, right, bottom);
             }
         }
+
 
         /// <summary>
         /// Handles the event which the sensor becomes unavailable (E.g. paused, closed, unplugged).
@@ -395,39 +490,64 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
         private void ComboCloth_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-
+            
         }
 
         private void ComboForeground_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            selectingForeground.Visibility = Visibility.Hidden;
             switch (ComboForeground.SelectedItem.ToString())
             {
-                case "路邊攤": Foreground_eggcake.Visibility = Visibility.Visible; break;
-                case "鳥居": Foreground_torii.Visibility = Visibility.Visible; break;
-                case "直升機": Foreground_heli.Visibility = Visibility.Visible; break;
-                default:
-                    {
-                        Foreground_eggcake.Visibility = Visibility.Hidden;
-                        Foreground_torii.Visibility = Visibility.Hidden;
-                        Foreground_heli.Visibility = Visibility.Hidden;
-                        break;
-                    }
+                case "路邊攤": selectingForeground = Foreground_eggcake; break;
+                case "鳥居": selectingForeground = Foreground_torii; break;
+                case "直升機": selectingForeground = Foreground_heli; break;
             }
+            selectingForeground.Visibility = Visibility.Visible;
         }
+
+
+        //Note : max height = 16000 , max width = 25000
+        //test for item go with mouse
+        /*
+        private void MainWindow_MouseMove(object sender , MouseEventArgs e)
+        {
+            Point p = e.GetPosition(BackgroundImage);
+            p_x.Text = p.X.ToString();
+            p_y.Text = p.Y.ToString();
+            double right = 23000 - p.X, bottom = 14000 - p.Y;
+            if (p.X < 0)
+            {
+                p.X = 0;
+                right = 23000;
+            }
+            if (p.Y < 0)
+            {
+                p.Y = 0;
+                bottom = 14000;
+            }
+            if (23000 < p.X)
+            {
+                p.X = 23000;
+                right = 0;
+            }
+            if (14000 < p.Y)
+            {
+                bottom = 0;
+                p.Y = 14000;
+            }
+            Item_photographer.Margin = new Thickness(p.X , p.Y , right , bottom);
+        }
+        */
 
         private void ComboItem_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            selectingItem.Visibility = Visibility.Hidden;
             switch (ComboItem.SelectedItem.ToString())
             {
-                case "相機": Item_photographer.Visibility = Visibility.Visible; break;
-                case "手提包": Item_bag.Visibility = Visibility.Visible; break;
-                default:
-                    {
-                        Item_photographer.Visibility = Visibility.Hidden;
-                        Item_bag.Visibility = Visibility.Hidden;
-                        break;
-                    }
+                case "相機": Item_photographer.Visibility = Visibility.Visible; selectingItem = Item_photographer; break;
+                case "手提包": Item_bag.Visibility = Visibility.Visible; selectingItem = Item_bag; break;
             }
+            selectingItem.Visibility = Visibility.Visible;
         }
 
         private void ComboBoxInitialize()
@@ -454,6 +574,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             ComboForeground.Items.Remove("鳥居");
             ComboForeground.Items.Remove("直升機");
         }
+
 
     }
 }
