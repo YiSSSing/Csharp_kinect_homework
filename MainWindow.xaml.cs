@@ -325,6 +325,51 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                             }
                         }
 
+                        var frame = multiSourceFrame.BodyFrameReference.AcquireFrame();
+                        if (frame!= null)
+                        {
+                            var _bodies = new Body[frame.BodyFrameSource.BodyCount];
+                            foreach (var body in _bodies)
+                            {
+                                if (body != null)
+                                {
+                                    Joint LeftHand = body.Joints[JointType.HandLeft];
+                                    float LeftHandX = LeftHand.Position.X;
+                                    float LeftHandY = LeftHand.Position.Y;
+                                    float LeftHandZ = LeftHand.Position.Z;
+                                    Joint RightHand = body.Joints[JointType.HandRight];
+                                    float RightHandX = RightHand.Position.X;
+                                    float RightHandY = RightHand.Position.Y;
+                                    float RightHandZ = RightHand.Position.Z;
+                                    Joint Spine = body.Joints[JointType.SpineMid];
+                                    float SpineX = Spine.Position.X;
+                                    float SpineY = Spine.Position.Y;
+                                    float SpineZ = Spine.Position.Z;
+                                    Joint LShoulder = body.Joints[JointType.ShoulderLeft];
+                                    Joint RShoulder = body.Joints[JointType.ShoulderRight];
+                                    double ShoudlerWidth = RShoulder.Position.X - LShoulder.Position.X;
+
+                                    TransformGroup ib = Item_bag.RenderTransform as TransformGroup;
+                                    TranslateTransform ibtt = ib.Children[0] as TranslateTransform;
+                                    ibtt.X = LeftHandX;
+                                    ibtt.Y = LeftHandY;
+
+                                    TransformGroup ip = Item_photographer.RenderTransform as TransformGroup;
+                                    TranslateTransform iptt = ip.Children[0] as TranslateTransform;
+                                    iptt.X = RightHandX;
+                                    iptt.Y = RightHandY;
+
+                                    TransformGroup cloth = Cloth.RenderTransform as TransformGroup;
+                                    TranslateTransform clothtt = cloth.Children[0] as TranslateTransform;
+                                    clothtt.X = SpineX;
+                                    clothtt.Y = SpineY;
+                                    ScaleTransform clothst = cloth.Children[0] as ScaleTransform;
+                                    clothst.ScaleX = ShoudlerWidth / Cloth.Width;
+                                    clothst.ScaleY = ShoudlerWidth / Cloth.Width;
+                                }
+                            }
+                            
+                        }
                         this.bitmap.AddDirtyRect(new Int32Rect(0, 0, this.bitmap.PixelWidth, this.bitmap.PixelHeight));
                     }
                 }
@@ -395,7 +440,12 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
         private void ComboCloth_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-
+            switch (ComboCloth.SelectedItem.ToString())
+            {
+                case "顯示": Cloth.Visibility = Visibility.Visible; break;
+                default: Cloth.Visibility = Visibility.Hidden; break;
+            }
+            
         }
 
         private void ComboForeground_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -442,6 +492,8 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             ComboItem.Items.Add("相機");
             ComboItem.Items.Add("手提包");
+
+            ComboCloth.Items.Add("顯示");
 
             ComboCountry.SelectedIndex = 0;
             ComboItem.SelectedIndex = 0;

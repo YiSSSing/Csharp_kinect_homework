@@ -51,11 +51,40 @@
             <Grid Name="CompositeImage" Width="25034" Height="15919">
                 <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-1875,0,-1885,0" />
                 <Image x:Name="BackgroundImage" Source="Images\Background.png" Stretch="UniformToFill" Grid.ColumnSpan="4" />
-                
-                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Margin="6628,12899,12799,573" Visibility="Hidden" />
-                <Image x:Name="Item_bag" Source="Images/item_bag.png" Margin="12430,13560,6561,676" Visibility="Hidden"/>
 
-                <Image x:Name="Foreground_eggcake" Margin="1087,6534,15584,121" Source="Images/eggcake.jpg" Visibility="Hidden" />
+                <Image x:Name="Cloth" Source="Images/cloth.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform ScaleX="0.4" ScaleY="0.4"/>
+                            <SkewTransform/>
+                            <RotateTransform/>
+                            <TranslateTransform Y="0" X="-50000"/>
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+                
+                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top" >
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform ScaleX="0.2" ScaleY="0.2"/>
+                            <SkewTransform/>
+                            <RotateTransform/>
+                            <TranslateTransform Y="0" X="-50000"/>
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+                <Image x:Name="Item_bag" Source="Images/item_bag.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform ScaleX="0.2" ScaleY="0.2"/>
+                            <SkewTransform/>
+                            <RotateTransform/>
+                            <TranslateTransform Y="0" X="-50000"/>
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+
+                <Image x:Name="Foreground_eggcake" Source="Images/eggcake.jpg" Margin="1087,6534,15584,121" Visibility="Hidden" />
                 <Image x:Name="Foreground_torii" Source="Images/torii.png" Margin="7534,1914,-626,344" Visibility="Hidden" />
                 <Image x:Name="Foreground_heli" Source="Images/heli.png" Margin="-92,7782,9483,84" Visibility="Hidden" />
             </Grid>
