@@ -24,7 +24,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         //global var here
-        private Image selectingItem = null, selectingForeground = null;
+        private Image selectingItem = null, selectingForeground = null, selectingCloth = null;
         private BodyFrameReader bodyFrameReader = null;
         private Body[] bodies;
         private const float InferredZPositionClamp = 0.1f;
@@ -115,6 +115,10 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             this.InitializeComponent();
 
             ComboBoxInitialize();
+
+            selectingItem = Item_bag;
+            selectingForeground = Foreground_eggcake;
+            selectingCloth = Cloth_shyatsu;
 
         }
 
@@ -391,6 +395,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                             }
 
                             this.DrawItemOnHand(body.HandRightState, jointPoints[JointType.HandRight]);
+                            this.DrawColthOnBody(jointPoints[JointType.SpineMid]);
                         }
                     }
                 }
@@ -414,12 +419,13 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
         }
 
         /// <summary>
-        /// bind items to player's right hand
+        /// draw items to player's right hand
         /// </summary>
         /// <param name="hs">hand state for kinect</param>
         /// <param name="handPosition">hand position</param>
         private void DrawItemOnHand(HandState hs , Point handPosition)
         {
+            //Note : png size of items are 2000*2000
             if (hs != HandState.NotTracked)
             {
                 double right = 23000 - handPosition.X, bottom = 14000 - handPosition.Y;
@@ -445,6 +451,37 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                 }
                 Item_photographer.Margin = new Thickness(handPosition.X, handPosition.Y, right, bottom);
             }
+        }
+
+        /// <summary>
+        /// draw cloth, margin to center of the player's body
+        /// </summary>
+        /// <param name="bodyPosition">player's body coordinate</param>
+        private void DrawColthOnBody(Point bodyPosition)
+        {
+            //Note : png size of shyatsu is 3000*3000
+            double right = 22000 - bodyPosition.X, bottom = 13000 - bodyPosition.Y;
+            if (bodyPosition.X < 0)
+            {
+                bodyPosition.X = 0;
+                right = 22000;
+            }
+            if (bodyPosition.Y < 0)
+            {
+                bodyPosition.Y = 0;
+                bottom = 13000;
+            }
+            if (22000 < bodyPosition.X)
+            {
+                bodyPosition.X = 22000;
+                right = 0;
+            }
+            if (13000 < bodyPosition.Y)
+            {
+                bottom = 0;
+                bodyPosition.Y = 13000;
+            }
+            Cloth_shyatsu.Margin = new Thickness(bodyPosition.X, bodyPosition.Y, right, bottom);
         }
 
 
@@ -490,19 +527,30 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
         private void ComboCloth_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            
+            bool isChanged = true;
+            selectingCloth.Visibility = Visibility.Hidden;
+            switch ( ComboCloth.SelectedItem.ToString() )
+            {
+                case "襯衫": selectingCloth = Cloth_shyatsu; break;
+                default: isChanged = false; break;
+            }
+            if (isChanged) selectingCloth.Visibility = Visibility.Visible;
+            else selectingCloth.Visibility = Visibility.Hidden;
         }
 
         private void ComboForeground_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            bool isChanged = true;
             selectingForeground.Visibility = Visibility.Hidden;
             switch (ComboForeground.SelectedItem.ToString())
             {
                 case "路邊攤": selectingForeground = Foreground_eggcake; break;
                 case "鳥居": selectingForeground = Foreground_torii; break;
                 case "直升機": selectingForeground = Foreground_heli; break;
+                default: isChanged = false; break;
             }
-            selectingForeground.Visibility = Visibility.Visible;
+            if (isChanged) selectingForeground.Visibility = Visibility.Visible;
+            else selectingForeground.Visibility = Visibility.Hidden;
         }
 
 
@@ -541,13 +589,16 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
         private void ComboItem_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            bool isChanged = true;
             selectingItem.Visibility = Visibility.Hidden;
             switch (ComboItem.SelectedItem.ToString())
             {
-                case "相機": Item_photographer.Visibility = Visibility.Visible; selectingItem = Item_photographer; break;
-                case "手提包": Item_bag.Visibility = Visibility.Visible; selectingItem = Item_bag; break;
+                case "相機": selectingItem = Item_photographer; break;
+                case "手提包": selectingItem = Item_bag; break;
+                default: isChanged = false; break;
             }
-            selectingItem.Visibility = Visibility.Visible;
+            if (isChanged) selectingItem.Visibility = Visibility.Visible;
+            else selectingItem.Visibility = Visibility.Hidden;
         }
 
         private void ComboBoxInitialize()
@@ -562,6 +613,8 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             ComboItem.Items.Add("相機");
             ComboItem.Items.Add("手提包");
+
+            ComboCloth.Items.Add("襯衫");
         }
 
         private void CountrySelectChanged()

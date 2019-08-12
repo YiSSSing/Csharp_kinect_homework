@@ -50,12 +50,16 @@
                 <Image x:Name="BackgroundImage" Source="Images\Background.png" Stretch="UniformToFill" Grid.ColumnSpan="4" />
                 <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-56,0,10,0" />
 
-                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Margin="13000,13500,10000,800" Height="2000" Width="2000" Visibility="Visible" />
-                <Image x:Name="Item_bag" Source="Images/item_bag.png" Margin="9100,13225,13934,694" Height="2000" Width="2000" Visibility="Visible"/>
+                <Image x:Name="Cloth_shyatsu" Source="Images/cloth.png" Height="3000" Width="3000" Margin="7169,6734,14865,6185" Visibility="Hidden"/>
+
+                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Margin="13000,13500,10000,800" Height="2000" Width="2000" Visibility="Hidden" />
+                <Image x:Name="Item_bag" Source="Images/item_bag.png" Margin="9100,13225,13934,694" Height="2000" Width="2000" Visibility="Hidden"/>
 
                 <Image x:Name="Foreground_eggcake" Margin="1087,6534,15584,121" Source="Images/eggcake.jpg" Visibility="Hidden" />
                 <Image x:Name="Foreground_torii" Source="Images/torii.png" Margin="7534,1914,-626,344" Visibility="Hidden" />
                 <Image x:Name="Foreground_heli" Source="Images/heli.png" Margin="-92,7782,9483,84" Visibility="Hidden" />
+                
+                
             </Grid>
         </Viewbox>
 
