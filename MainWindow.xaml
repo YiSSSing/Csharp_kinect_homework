@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Kinect homework" 
         Height="600" Width="700" 
-        Closing="MainWindow_Closing">
+        Closing="MainWindow_Closing"
+        Loaded="MainWindow_Loaded">
     <Window.Resources>
         <SolidColorBrush x:Key="MediumGreyBrush" Color="#ff6e6e6e" />
         <SolidColorBrush x:Key="KinectPurpleBrush" Color="#ff52318f" />
@@ -53,34 +54,34 @@
                 <Image x:Name="BackgroundImage" Source="Images\Background.png" Stretch="UniformToFill" Grid.ColumnSpan="4" />
                 <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-1875,0,-1885,0" />
                 
-                <Image x:Name="Cloth" Source="Images/cloth.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Image x:Name="Cloth" Source="Images/cloth.png" Visibility="Hidden" Height="3000" Width="3000" HorizontalAlignment="Left" VerticalAlignment="Top">
                     <Image.RenderTransform>
                         <TransformGroup>
-                            <ScaleTransform ScaleX="0.4" ScaleY="0.4"/>
+                            <ScaleTransform ScaleX="1" ScaleY="1"/>
                             <SkewTransform/>
                             <RotateTransform/>
-                            <TranslateTransform Y="0" X="-50000"/>
+                            <TranslateTransform Y="0" X="0"/>
                         </TransformGroup>
                     </Image.RenderTransform>
                 </Image>
                 
-                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top" >
+                <Image x:Name="Item_photographer" Source="Images/item_photographer.png" Height="2000" Width="2000" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top" >
                     <Image.RenderTransform>
                         <TransformGroup>
-                            <ScaleTransform ScaleX="0.2" ScaleY="0.2"/>
+                            <ScaleTransform ScaleX="1" ScaleY="1"/>
                             <SkewTransform/>
                             <RotateTransform/>
-                            <TranslateTransform Y="0" X="-50000"/>
+                            <TranslateTransform Y="0" X="0"/>
                         </TransformGroup>
                     </Image.RenderTransform>
                 </Image>
-                <Image x:Name="Item_bag" Source="Images/item_bag.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Image x:Name="Item_bag" Source="Images/item_bag.png" Width="2000" Height="2000" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
                     <Image.RenderTransform>
                         <TransformGroup>
-                            <ScaleTransform ScaleX="0.2" ScaleY="0.2"/>
+                            <ScaleTransform ScaleX="1" ScaleY="1"/>
                             <SkewTransform/>
                             <RotateTransform/>
-                            <TranslateTransform Y="0" X="-50000"/>
+                            <TranslateTransform Y="0" X="0"/>
                         </TransformGroup>
                     </Image.RenderTransform>
                 </Image>
@@ -88,8 +89,14 @@
                 <Image x:Name="Foreground_eggcake" Source="Images/eggcake.jpg" Margin="1087,6534,15584,121" Visibility="Hidden" />
                 <Image x:Name="Foreground_torii" Source="Images/torii.png" Margin="7534,1914,-626,344" Visibility="Hidden" />
                 <Image x:Name="Foreground_heli" Source="Images/heli.png" Margin="-92,7782,9483,84" Visibility="Hidden" />
+                
+                
             </Grid>
         </Viewbox>
+
+        <TextBox x:Name="test_x" Grid.Row="4" Height="40" Width="120" HorizontalAlignment="Left" />
+        <TextBox x:Name="test_y" Grid.Row="4" Height="40" Width="120" />
+        <TextBox x:Name="test_t" Grid.Row="4" Height="40" Width="120" HorizontalAlignment="Right" />
 
         <Button Grid.Row="4" Style="{StaticResource ScreenshotButton}" Content="Screenshot" Height="Auto" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10 10 0 10" Click="ScreenshotButton_Click" />
 

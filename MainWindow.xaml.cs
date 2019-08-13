@@ -7,6 +7,7 @@
 namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 {
     using System;
+    using System.Collections.Generic;
     using System.ComponentModel;
     using System.Diagnostics;
     using System.Globalization;
@@ -21,6 +22,10 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private BodyFrameReader bodyFrameReader = null;
+        private Body[] bodies;
+        private const float InferredZPositionClamp = 0.1f;
+
         /// <summary>
         /// Size of the RGB pixel in the bitmap
         /// </summary>
@@ -72,6 +77,8 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             this.multiFrameSourceReader.MultiSourceFrameArrived += this.Reader_MultiSourceFrameArrived;
 
+            this.bodyFrameReader = this.kinectSensor.BodyFrameSource.OpenReader();
+
             this.coordinateMapper = this.kinectSensor.CoordinateMapper;
 
             FrameDescription depthFrameDescription = this.kinectSensor.DepthFrameSource.FrameDescription;
@@ -103,6 +110,192 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             this.InitializeComponent();
 
             ComboBoxInitialize();
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (this.bodyFrameReader != null)
+            {
+                this.bodyFrameReader.FrameArrived += this.Reader_FrameArrived;
+            }
+        }
+
+        private void Reader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
+        {
+
+            bool bodyDataReceived = false;
+            /*
+            using (BodyFrame bodyFrame = e.FrameReference.AcquireFrame())
+            {
+                if (bodyFrame != null)
+                {
+                    test_t.Text = "frame exist";
+                    Body[] _bodies = new Body[bodyFrame.BodyFrameSource.BodyCount];
+                    foreach (Body body in _bodies)
+                    {
+                        if (body != null)
+                        {
+                            Joint LeftHand = body.Joints[JointType.HandLeft];
+                            float LeftHandX = LeftHand.Position.X;
+                            float LeftHandY = LeftHand.Position.Y;
+                            float LeftHandZ = LeftHand.Position.Z;
+                            Joint RightHand = body.Joints[JointType.HandRight];
+                            float RightHandX = RightHand.Position.X;
+                            float RightHandY = RightHand.Position.Y;
+                            float RightHandZ = RightHand.Position.Z;
+                            Joint Spine = body.Joints[JointType.SpineMid];
+                            float SpineX = Spine.Position.X;
+                            float SpineY = Spine.Position.Y;
+                            float SpineZ = Spine.Position.Z;
+                            Joint LShoulder = body.Joints[JointType.ShoulderLeft];
+                            Joint RShoulder = body.Joints[JointType.ShoulderRight];
+                            double ShoudlerWidth = RShoulder.Position.X - LShoulder.Position.X;
+
+                            TransformGroup ib = Item_bag.RenderTransform as TransformGroup;
+                            TranslateTransform ibtt = ib.Children[0] as TranslateTransform;
+                            ibtt.X = LeftHandX;
+                            ibtt.Y = LeftHandY;
+
+                            TransformGroup ip = Item_photographer.RenderTransform as TransformGroup;
+                            TranslateTransform iptt = ip.Children[0] as TranslateTransform;
+                            iptt.X = RightHandX;
+                            iptt.Y = RightHandY;
+
+                            TransformGroup cloth = Cloth.RenderTransform as TransformGroup;
+                            TranslateTransform clothtt = cloth.Children[0] as TranslateTransform;
+                            clothtt.X = SpineX;
+                            clothtt.Y = SpineY;
+                            ScaleTransform clothst = cloth.Children[0] as ScaleTransform;
+                            clothst.ScaleX = ShoudlerWidth / Cloth.Width;
+                            clothst.ScaleY = ShoudlerWidth / Cloth.Width;
+                            test_x.Text = RightHandX.ToString();
+                            test_y.Text = RightHandY.ToString();
+                        }
+                    }
+                }
+                else test_t.Text = "frame is null";
+                */
+
+            using (BodyFrame bodyFrame = e.FrameReference.AcquireFrame() )
+            {
+                if (bodyFrame != null)
+                {
+                    if (this.bodies == null)
+                    {
+                        this.bodies = new Body[bodyFrame.BodyCount];
+                    }
+
+                    // The first time GetAndRefreshBodyData is called, Kinect will allocate each Body in the array.
+                    // As long as those body objects are not disposed and not set to null in the array,
+                    // those body objects will be re-used.
+                    bodyFrame.GetAndRefreshBodyData(this.bodies);
+                    bodyDataReceived = true;
+                }
+            }
+
+            if (bodyDataReceived)
+            {
+
+                foreach (Body body in this.bodies)
+                {
+
+                    if (body.IsTracked)
+                    {
+                        IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+
+                        // convert the joint points to depth (display) space
+                        Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+
+                        foreach (JointType jointType in joints.Keys)
+                        {
+                            // sometimes the depth(Z) of an inferred joint may show as negative
+                            // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                            CameraSpacePoint position = joints[jointType].Position;
+                            if (position.Z < 0)
+                            {
+                                position.Z = InferredZPositionClamp;
+                            }
+
+                            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                            jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                        }
+                        test_x.Text = jointPoints[JointType.SpineMid].X.ToString();
+                        test_y.Text = jointPoints[JointType.SpineMid].Y.ToString();
+                        this.DrawItemOnHand(body.HandRightState, jointPoints[JointType.HandLeft]);
+                        this.DrawColthOnBody(jointPoints[JointType.SpineMid]);
+                    }
+                }
+            }
+
+        }
+
+        /// <summary>
+        /// draw items to player's left hand, kinect's coordinate on background is 500*360 according to 25000*16000
+        /// </summary>
+        /// <param name="hs">hand state for kinect</param>
+        /// <param name="handPosition">hand position</param>
+        private void DrawItemOnHand(HandState hs, Point handPosition)
+        {
+            double positionX = handPosition.X * 50, positionY = handPosition.Y * 44.4444;
+
+            //Note : png size of items are 2000*2000
+            if (hs != HandState.NotTracked)
+            {
+                double right = 23000 - positionX , bottom = 14000 - positionY;
+                if (positionX < 0)
+                {
+                    positionX = 0;
+                    right = 23000;
+                }
+                if (positionY < 0)
+                {
+                    positionY = 0;
+                    bottom = 14000;
+                }
+                if (23000 < positionX)
+                {
+                    positionX = 23000;
+                    right = 0;
+                }
+                if (14000 < positionY)
+                {
+                    bottom = 0;
+                    positionY = 14000;
+                }
+                Item_photographer.Margin = new Thickness(positionX, positionY, right, bottom);
+            }
+        }
+
+        /// <summary>
+        /// draw cloth, margin to center of the player's body
+        /// </summary>
+        /// <param name="bodyPosition">player's body coordinate</param>
+        private void DrawColthOnBody(Point bodyPosition)
+        {
+            double positionX = bodyPosition.X * 50, positionY = bodyPosition.Y * 44.444;
+            //Note : png size of shyatsu is 3000*3000
+            double right = 22000 - positionX, bottom = 13000 - positionY;
+            if (positionX < 0)
+            {
+                positionX = 0;
+                right = 22000;
+            }
+            if (positionY < 0)
+            {
+                positionY = 0;
+                bottom = 13000;
+            }
+            if (22000 < positionX)
+            {
+                positionX = 22000;
+                right = 0;
+            }
+            if (13000 < positionY)
+            {
+                bottom = 0;
+                positionY = 13000;
+            }
+            Cloth.Margin = new Thickness(positionX, positionY, right, bottom);
         }
 
         /// <summary>
@@ -240,10 +433,12 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                 depthFrame = multiSourceFrame.DepthFrameReference.AcquireFrame();
                 colorFrame = multiSourceFrame.ColorFrameReference.AcquireFrame();
                 bodyIndexFrame = multiSourceFrame.BodyIndexFrameReference.AcquireFrame();
+                //bodyFrame = multiSourceFrame.BodyFrameReference.AcquireFrame();
+
 
                 // If any frame has expired by the time we process this event, return.
                 // The "finally" statement will Dispose any that are not null.
-                if ((depthFrame == null) || (colorFrame == null) || (bodyIndexFrame == null))
+                if ((depthFrame == null) || (colorFrame == null) || (bodyIndexFrame == null) )
                 {
                     return;
                 }
@@ -324,52 +519,60 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                                 bitmapPixelsPointer[colorIndex] = 0;
                             }
                         }
-
-                        var frame = multiSourceFrame.BodyFrameReference.AcquireFrame();
-                        if (frame!= null)
+                        /*
+                        using (bodyFrame = e.FrameReference.AcquireFrame().BodyFrameReference.AcquireFrame() )
                         {
-                            var _bodies = new Body[frame.BodyFrameSource.BodyCount];
-                            foreach (var body in _bodies)
+                            if (bodyFrame != null)
                             {
-                                if (body != null)
+                                Body[] _bodies = new Body[bodyFrame.BodyFrameSource.BodyCount];
+                                foreach (Body body in _bodies)
                                 {
-                                    Joint LeftHand = body.Joints[JointType.HandLeft];
-                                    float LeftHandX = LeftHand.Position.X;
-                                    float LeftHandY = LeftHand.Position.Y;
-                                    float LeftHandZ = LeftHand.Position.Z;
-                                    Joint RightHand = body.Joints[JointType.HandRight];
-                                    float RightHandX = RightHand.Position.X;
-                                    float RightHandY = RightHand.Position.Y;
-                                    float RightHandZ = RightHand.Position.Z;
-                                    Joint Spine = body.Joints[JointType.SpineMid];
-                                    float SpineX = Spine.Position.X;
-                                    float SpineY = Spine.Position.Y;
-                                    float SpineZ = Spine.Position.Z;
-                                    Joint LShoulder = body.Joints[JointType.ShoulderLeft];
-                                    Joint RShoulder = body.Joints[JointType.ShoulderRight];
-                                    double ShoudlerWidth = RShoulder.Position.X - LShoulder.Position.X;
+                                    if (body != null)
+                                    {
+                                        Joint LeftHand = body.Joints[JointType.HandLeft];
+                                        float LeftHandX = LeftHand.Position.X;
+                                        float LeftHandY = LeftHand.Position.Y;
+                                        float LeftHandZ = LeftHand.Position.Z;
+                                        Joint RightHand = body.Joints[JointType.HandRight];
+                                        float RightHandX = RightHand.Position.X;
+                                        float RightHandY = RightHand.Position.Y;
+                                        float RightHandZ = RightHand.Position.Z;
+                                        Joint Spine = body.Joints[JointType.SpineMid];
+                                        float SpineX = Spine.Position.X;
+                                        float SpineY = Spine.Position.Y;
+                                        float SpineZ = Spine.Position.Z;
+                                        Joint LShoulder = body.Joints[JointType.ShoulderLeft];
+                                        Joint RShoulder = body.Joints[JointType.ShoulderRight];
+                                        double ShoudlerWidth = RShoulder.Position.X - LShoulder.Position.X;
 
-                                    TransformGroup ib = Item_bag.RenderTransform as TransformGroup;
-                                    TranslateTransform ibtt = ib.Children[0] as TranslateTransform;
-                                    ibtt.X = LeftHandX;
-                                    ibtt.Y = LeftHandY;
+                                        TransformGroup ib = Item_bag.RenderTransform as TransformGroup;
+                                        TranslateTransform ibtt = ib.Children[0] as TranslateTransform;
+                                        ibtt.X = LeftHandX;
+                                        ibtt.Y = LeftHandY;
 
-                                    TransformGroup ip = Item_photographer.RenderTransform as TransformGroup;
-                                    TranslateTransform iptt = ip.Children[0] as TranslateTransform;
-                                    iptt.X = RightHandX;
-                                    iptt.Y = RightHandY;
+                                        TransformGroup ip = Item_photographer.RenderTransform as TransformGroup;
+                                        TranslateTransform iptt = ip.Children[0] as TranslateTransform;
+                                        iptt.X = RightHandX;
+                                        iptt.Y = RightHandY;
 
-                                    TransformGroup cloth = Cloth.RenderTransform as TransformGroup;
-                                    TranslateTransform clothtt = cloth.Children[0] as TranslateTransform;
-                                    clothtt.X = SpineX;
-                                    clothtt.Y = SpineY;
-                                    ScaleTransform clothst = cloth.Children[0] as ScaleTransform;
-                                    clothst.ScaleX = ShoudlerWidth / Cloth.Width;
-                                    clothst.ScaleY = ShoudlerWidth / Cloth.Width;
+                                        TransformGroup cloth = Cloth.RenderTransform as TransformGroup;
+                                        TranslateTransform clothtt = cloth.Children[0] as TranslateTransform;
+                                        clothtt.X = SpineX;
+                                        clothtt.Y = SpineY;
+                                        ScaleTransform clothst = cloth.Children[0] as ScaleTransform;
+                                        clothst.ScaleX = ShoudlerWidth / Cloth.Width;
+                                        clothst.ScaleY = ShoudlerWidth / Cloth.Width;
+                                        test_x.Text = RightHandX.ToString();
+                                        test_y.Text = RightHandY.ToString();
+                                    }
+                                    //else test_x.Text = "no hand detected";
                                 }
+
                             }
+                            //else test_t.Text = "frame is null";
                             
                         }
+                        */
                         this.bitmap.AddDirtyRect(new Int32Rect(0, 0, this.bitmap.PixelWidth, this.bitmap.PixelHeight));
                     }
                 }
@@ -508,6 +711,8 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             ComboForeground.Items.Remove("鳥居");
             ComboForeground.Items.Remove("直升機");
         }
+
+
 
     }
 }
