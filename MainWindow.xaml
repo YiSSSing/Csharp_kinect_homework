@@ -49,9 +49,10 @@
 
         <Viewbox Grid.Row="3" HorizontalAlignment="Center">
             <Grid Name="CompositeImage" Width="25034" Height="15919">
-                <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-1875,0,-1885,0" />
+                
                 <Image x:Name="BackgroundImage" Source="Images\Background.png" Stretch="UniformToFill" Grid.ColumnSpan="4" />
-
+                <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-1875,0,-1885,0" />
+                
                 <Image x:Name="Cloth" Source="Images/cloth.png" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
                     <Image.RenderTransform>
                         <TransformGroup>
