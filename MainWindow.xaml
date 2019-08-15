@@ -54,10 +54,10 @@
                 <Image x:Name="BackgroundImage" Source="Images\Background.png" Stretch="UniformToFill" Grid.ColumnSpan="4" />
                 <Image Source="{Binding ImageSource}" Stretch="UniformToFill" Margin="-1875,0,-1885,0" />
                 
-                <Image x:Name="Cloth" Source="Images/cloth.png" Visibility="Hidden" Height="3000" Width="3000" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Image x:Name="Cloth" Source="Images/cloth.png" Visibility="Hidden" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Image.RenderTransform>
                         <TransformGroup>
-                            <ScaleTransform ScaleX="1" ScaleY="1"/>
+                            <ScaleTransform/>
                             <SkewTransform/>
                             <RotateTransform/>
                             <TranslateTransform Y="0" X="0"/>
