@@ -9,11 +9,10 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
     using System;
     using System.Collections.Generic;
     using System.ComponentModel;
+    using System.Diagnostics;
     using System.Globalization;
     using System.IO;
     using System.Windows;
-    using System.Windows.Controls;
-    using System.Windows.Input;
     using System.Windows.Media;
     using System.Windows.Media.Imaging;
     using Microsoft.Kinect;
@@ -23,8 +22,6 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        //global var here
-        private Image selectingItem = null, selectingForeground = null, selectingCloth = null;
         private BodyFrameReader bodyFrameReader = null;
         private Body[] bodies;
         private const float InferredZPositionClamp = 0.1f;
@@ -34,7 +31,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
         /// </summary>
         private readonly int bytesPerPixel = (PixelFormats.Bgr32.BitsPerPixel + 7) / 8;
 
-        /// <summary>
+        /// <summary>;'''''''''''''''''''''''''''''''''''''''''''''''''''''''
         /// Active Kinect sensor
         /// </summary>
         private KinectSensor kinectSensor = null;
@@ -78,11 +75,9 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
             this.multiFrameSourceReader = this.kinectSensor.OpenMultiSourceFrameReader(FrameSourceTypes.Depth | FrameSourceTypes.Color | FrameSourceTypes.BodyIndex);
 
-            //deal with coordinate mapping
             this.multiFrameSourceReader.MultiSourceFrameArrived += this.Reader_MultiSourceFrameArrived;
 
-            //deal with item on hand tracking
-            //this.bodyFrameReader.FrameArrived += this.Reader_FrameArrived;
+            this.bodyFrameReader = this.kinectSensor.BodyFrameSource.OpenReader();
 
             this.coordinateMapper = this.kinectSensor.CoordinateMapper;
 
@@ -115,11 +110,192 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             this.InitializeComponent();
 
             ComboBoxInitialize();
+        }
 
-            selectingItem = Item_bag;
-            selectingForeground = Foreground_eggcake;
-            selectingCloth = Cloth_shyatsu;
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (this.bodyFrameReader != null)
+            {
+                this.bodyFrameReader.FrameArrived += this.Reader_FrameArrived;
+            }
+        }
 
+        private void Reader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
+        {
+
+            bool bodyDataReceived = false;
+            /*
+            using (BodyFrame bodyFrame = e.FrameReference.AcquireFrame())
+            {
+                if (bodyFrame != null)
+                {
+                    test_t.Text = "frame exist";
+                    Body[] _bodies = new Body[bodyFrame.BodyFrameSource.BodyCount];
+                    foreach (Body body in _bodies)
+                    {
+                        if (body != null)
+                        {
+                            Joint LeftHand = body.Joints[JointType.HandLeft];
+                            float LeftHandX = LeftHand.Position.X;
+                            float LeftHandY = LeftHand.Position.Y;
+                            float LeftHandZ = LeftHand.Position.Z;
+                            Joint RightHand = body.Joints[JointType.HandRight];
+                            float RightHandX = RightHand.Position.X;
+                            float RightHandY = RightHand.Position.Y;
+                            float RightHandZ = RightHand.Position.Z;
+                            Joint Spine = body.Joints[JointType.SpineMid];
+                            float SpineX = Spine.Position.X;
+                            float SpineY = Spine.Position.Y;
+                            float SpineZ = Spine.Position.Z;
+                            Joint LShoulder = body.Joints[JointType.ShoulderLeft];
+                            Joint RShoulder = body.Joints[JointType.ShoulderRight];
+                            double ShoudlerWidth = RShoulder.Position.X - LShoulder.Position.X;
+
+                            TransformGroup ib = Item_bag.RenderTransform as TransformGroup;
+                            TranslateTransform ibtt = ib.Children[0] as TranslateTransform;
+                            ibtt.X = LeftHandX;
+                            ibtt.Y = LeftHandY;
+
+                            TransformGroup ip = Item_photographer.RenderTransform as TransformGroup;
+                            TranslateTransform iptt = ip.Children[0] as TranslateTransform;
+                            iptt.X = RightHandX;
+                            iptt.Y = RightHandY;
+
+                            TransformGroup cloth = Cloth.RenderTransform as TransformGroup;
+                            TranslateTransform clothtt = cloth.Children[0] as TranslateTransform;
+                            clothtt.X = SpineX;
+                            clothtt.Y = SpineY;
+                            ScaleTransform clothst = cloth.Children[0] as ScaleTransform;
+                            clothst.ScaleX = ShoudlerWidth / Cloth.Width;
+                            clothst.ScaleY = ShoudlerWidth / Cloth.Width;
+                            test_x.Text = RightHandX.ToString();
+                            test_y.Text = RightHandY.ToString();
+                        }
+                    }
+                }
+                else test_t.Text = "frame is null";
+                */
+
+            using (BodyFrame bodyFrame = e.FrameReference.AcquireFrame() )
+            {
+                if (bodyFrame != null)
+                {
+                    if (this.bodies == null)
+                    {
+                        this.bodies = new Body[bodyFrame.BodyCount];
+                    }
+
+                    // The first time GetAndRefreshBodyData is called, Kinect will allocate each Body in the array.
+                    // As long as those body objects are not disposed and not set to null in the array,
+                    // those body objects will be re-used.
+                    bodyFrame.GetAndRefreshBodyData(this.bodies);
+                    bodyDataReceived = true;
+                }
+            }
+
+            if (bodyDataReceived)
+            {
+
+                foreach (Body body in this.bodies)
+                {
+
+                    if (body.IsTracked)
+                    {
+                        IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+
+                        // convert the joint points to depth (display) space
+                        Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+
+                        foreach (JointType jointType in joints.Keys)
+                        {
+                            // sometimes the depth(Z) of an inferred joint may show as negative
+                            // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                            CameraSpacePoint position = joints[jointType].Position;
+                            if (position.Z < 0)
+                            {
+                                position.Z = InferredZPositionClamp;
+                            }
+
+                            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                            jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                        }
+                        test_x.Text = jointPoints[JointType.SpineMid].X.ToString();
+                        test_y.Text = jointPoints[JointType.SpineMid].Y.ToString();
+                        this.DrawItemOnHand(body.HandRightState, jointPoints[JointType.HandLeft]);
+                        this.DrawColthOnBody(jointPoints[JointType.SpineMid]);
+                    }
+                }
+            }
+
+        }
+
+        /// <summary>
+        /// draw items to player's left hand, kinect's coordinate on background is 500*360 according to 25000*16000
+        /// </summary>
+        /// <param name="hs">hand state for kinect</param>
+        /// <param name="handPosition">hand position</param>
+        private void DrawItemOnHand(HandState hs, Point handPosition)
+        {
+            double positionX = handPosition.X * 50, positionY = handPosition.Y * 44.4444;
+
+            //Note : png size of items are 2000*2000
+            if (hs != HandState.NotTracked)
+            {
+                double right = 23000 - positionX , bottom = 14000 - positionY;
+                if (positionX < 0)
+                {
+                    positionX = 0;
+                    right = 23000;
+                }
+                if (positionY < 0)
+                {
+                    positionY = 0;
+                    bottom = 14000;
+                }
+                if (23000 < positionX)
+                {
+                    positionX = 23000;
+                    right = 0;
+                }
+                if (14000 < positionY)
+                {
+                    bottom = 0;
+                    positionY = 14000;
+                }
+                Item_photographer.Margin = new Thickness(positionX, positionY, right, bottom);
+            }
+        }
+
+        /// <summary>
+        /// draw cloth, margin to center of the player's body
+        /// </summary>
+        /// <param name="bodyPosition">player's body coordinate</param>
+        private void DrawColthOnBody(Point bodyPosition)
+        {
+            double positionX = bodyPosition.X * 50, positionY = bodyPosition.Y * 44.444;
+            //Note : png size of shyatsu is 3000*3000
+            double right = 22000 - positionX, bottom = 13000 - positionY;
+            if (positionX < 0)
+            {
+                positionX = 0;
+                right = 22000;
+            }
+            if (positionY < 0)
+            {
+                positionY = 0;
+                bottom = 13000;
+            }
+            if (22000 < positionX)
+            {
+                positionX = 22000;
+                right = 0;
+            }
+            if (13000 < positionY)
+            {
+                bottom = 0;
+                positionY = 13000;
+            }
+            Cloth.Margin = new Thickness(positionX, positionY, right, bottom);
         }
 
         /// <summary>
@@ -232,7 +408,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
         /// </summary>
         /// <param name="sender">object sending the event</param>
         /// <param name="e">event arguments</param>
-        private void Reader_MultiSourceFrameArrived(object sender, MultiSourceFrameArrivedEventArgs e )
+        private void Reader_MultiSourceFrameArrived(object sender, MultiSourceFrameArrivedEventArgs e)
         {
             int depthWidth = 0;
             int depthHeight = 0;
@@ -240,8 +416,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             DepthFrame depthFrame = null;
             ColorFrame colorFrame = null;
             BodyIndexFrame bodyIndexFrame = null;
-            BodyFrame bodyFrame = null;
-            bool isBitmapLocked = false, bodyDataReceived = false;
+            bool isBitmapLocked = false;
 
             MultiSourceFrame multiSourceFrame = e.FrameReference.AcquireFrame();           
 
@@ -255,15 +430,15 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             // This includes calling Dispose on any Frame objects that we may have and unlocking the bitmap back buffer.
             try
             {                
-                //get the frame and prepare to do something
                 depthFrame = multiSourceFrame.DepthFrameReference.AcquireFrame();
                 colorFrame = multiSourceFrame.ColorFrameReference.AcquireFrame();
                 bodyIndexFrame = multiSourceFrame.BodyIndexFrameReference.AcquireFrame();
-                bodyFrame = multiSourceFrame.BodyFrameReference.AcquireFrame();
+                //bodyFrame = multiSourceFrame.BodyFrameReference.AcquireFrame();
+
 
                 // If any frame has expired by the time we process this event, return.
                 // The "finally" statement will Dispose any that are not null.
-                if ((depthFrame == null) || (colorFrame == null) || (bodyIndexFrame == null) || (bodyFrame == null) )
+                if ((depthFrame == null) || (colorFrame == null) || (bodyIndexFrame == null) )
                 {
                     return;
                 }
@@ -344,146 +519,87 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
                                 bitmapPixelsPointer[colorIndex] = 0;
                             }
                         }
+                        /*
+                        using (bodyFrame = e.FrameReference.AcquireFrame().BodyFrameReference.AcquireFrame() )
+                        {
+                            if (bodyFrame != null)
+                            {
+                                Body[] _bodies = new Body[bodyFrame.BodyFrameSource.BodyCount];
+                                foreach (Body body in _bodies)
+                                {
+                                    if (body != null)
+                                    {
+                                        Joint LeftHand = body.Joints[JointType.HandLeft];
+                                        float LeftHandX = LeftHand.Position.X;
+                                        float LeftHandY = LeftHand.Position.Y;
+                                        float LeftHandZ = LeftHand.Position.Z;
+                                        Joint RightHand = body.Joints[JointType.HandRight];
+                                        float RightHandX = RightHand.Position.X;
+                                        float RightHandY = RightHand.Position.Y;
+                                        float RightHandZ = RightHand.Position.Z;
+                                        Joint Spine = body.Joints[JointType.SpineMid];
+                                        float SpineX = Spine.Position.X;
+                                        float SpineY = Spine.Position.Y;
+                                        float SpineZ = Spine.Position.Z;
+                                        Joint LShoulder = body.Joints[JointType.ShoulderLeft];
+                                        Joint RShoulder = body.Joints[JointType.ShoulderRight];
+                                        double ShoudlerWidth = RShoulder.Position.X - LShoulder.Position.X;
 
+                                        TransformGroup ib = Item_bag.RenderTransform as TransformGroup;
+                                        TranslateTransform ibtt = ib.Children[0] as TranslateTransform;
+                                        ibtt.X = LeftHandX;
+                                        ibtt.Y = LeftHandY;
+
+                                        TransformGroup ip = Item_photographer.RenderTransform as TransformGroup;
+                                        TranslateTransform iptt = ip.Children[0] as TranslateTransform;
+                                        iptt.X = RightHandX;
+                                        iptt.Y = RightHandY;
+
+                                        TransformGroup cloth = Cloth.RenderTransform as TransformGroup;
+                                        TranslateTransform clothtt = cloth.Children[0] as TranslateTransform;
+                                        clothtt.X = SpineX;
+                                        clothtt.Y = SpineY;
+                                        ScaleTransform clothst = cloth.Children[0] as ScaleTransform;
+                                        clothst.ScaleX = ShoudlerWidth / Cloth.Width;
+                                        clothst.ScaleY = ShoudlerWidth / Cloth.Width;
+                                        test_x.Text = RightHandX.ToString();
+                                        test_y.Text = RightHandY.ToString();
+                                    }
+                                    //else test_x.Text = "no hand detected";
+                                }
+
+                            }
+                            //else test_t.Text = "frame is null";
+                            
+                        }
+                        */
                         this.bitmap.AddDirtyRect(new Int32Rect(0, 0, this.bitmap.PixelWidth, this.bitmap.PixelHeight));
                     }
                 }
-
-                //here is from body basic example
-                using (bodyFrame)
-                {
-                    if (bodyFrame != null)
-                    {
-                        if (this.bodies == null)
-                        {
-                            this.bodies = new Body[bodyFrame.BodyCount];
-                        }
-
-                        // The first time GetAndRefreshBodyData is called, Kinect will allocate each Body in the array.
-                        // As long as those body objects are not disposed and not set to null in the array,
-                        // those body objects will be re-used.
-                        bodyFrame.GetAndRefreshBodyData(this.bodies);
-                        bodyDataReceived = true;
-                    }
-                }
-
-                if (bodyDataReceived)
-                { 
-
-                    foreach (Body body in this.bodies)
-                    {
-
-                        if (body.IsTracked)
-                        {
-                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
-
-                            // convert the joint points to depth (display) space
-                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
-
-                            foreach (JointType jointType in joints.Keys)
-                            {
-                                // sometimes the depth(Z) of an inferred joint may show as negative
-                                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
-                                CameraSpacePoint position = joints[jointType].Position;
-                                if (position.Z < 0)
-                                {
-                                    position.Z = InferredZPositionClamp;
-                                }
-
-                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
-                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
-                            }
-
-                            this.DrawItemOnHand(body.HandRightState, jointPoints[JointType.HandRight]);
-                            this.DrawColthOnBody(jointPoints[JointType.SpineMid]);
-                        }
-                    }
-                }
-
-                //done with body frame
-                bodyFrame.Dispose();
-                bodyFrame = null;
-
-            }catch ( Exception )
-            {
-                //nothing here
-            }finally
-            {
-                if (isBitmapLocked) this.bitmap.Unlock();
-                if (depthFrame != null) depthFrame.Dispose();
-                if (colorFrame != null) colorFrame.Dispose();
-                if (bodyIndexFrame != null) bodyIndexFrame.Dispose();
-                if ( bodyFrame != null ) bodyFrame.Dispose();
             }
-
-        }
-
-        /// <summary>
-        /// draw items to player's right hand
-        /// </summary>
-        /// <param name="hs">hand state for kinect</param>
-        /// <param name="handPosition">hand position</param>
-        private void DrawItemOnHand(HandState hs , Point handPosition)
-        {
-            //Note : png size of items are 2000*2000
-            if (hs != HandState.NotTracked)
+            finally
             {
-                double right = 23000 - handPosition.X, bottom = 14000 - handPosition.Y;
-                if (handPosition.X < 0)
+                if (isBitmapLocked)
                 {
-                    handPosition.X = 0;
-                    right = 23000;
+                    this.bitmap.Unlock();
                 }
-                if (handPosition.Y < 0)
+
+                if (depthFrame != null)
                 {
-                    handPosition.Y = 0;
-                    bottom = 14000;
+                    depthFrame.Dispose();
                 }
-                if (23000 < handPosition.X)
+
+                if (colorFrame != null)
                 {
-                    handPosition.X = 23000;
-                    right = 0;
+                    colorFrame.Dispose();
                 }
-                if (14000 < handPosition.Y)
+
+                if (bodyIndexFrame != null)
                 {
-                    bottom = 0;
-                    handPosition.Y = 14000;
+                    bodyIndexFrame.Dispose();
                 }
-                Item_photographer.Margin = new Thickness(handPosition.X, handPosition.Y, right, bottom);
             }
         }
-
-        /// <summary>
-        /// draw cloth, margin to center of the player's body
-        /// </summary>
-        /// <param name="bodyPosition">player's body coordinate</param>
-        private void DrawColthOnBody(Point bodyPosition)
-        {
-            //Note : png size of shyatsu is 3000*3000
-            double right = 22000 - bodyPosition.X, bottom = 13000 - bodyPosition.Y;
-            if (bodyPosition.X < 0)
-            {
-                bodyPosition.X = 0;
-                right = 22000;
-            }
-            if (bodyPosition.Y < 0)
-            {
-                bodyPosition.Y = 0;
-                bottom = 13000;
-            }
-            if (22000 < bodyPosition.X)
-            {
-                bodyPosition.X = 22000;
-                right = 0;
-            }
-            if (13000 < bodyPosition.Y)
-            {
-                bottom = 0;
-                bodyPosition.Y = 13000;
-            }
-            Cloth_shyatsu.Margin = new Thickness(bodyPosition.X, bodyPosition.Y, right, bottom);
-        }
-
 
         /// <summary>
         /// Handles the event which the sensor becomes unavailable (E.g. paused, closed, unplugged).
@@ -527,78 +643,44 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
 
         private void ComboCloth_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            bool isChanged = true;
-            selectingCloth.Visibility = Visibility.Hidden;
-            switch ( ComboCloth.SelectedItem.ToString() )
+            switch (ComboCloth.SelectedItem.ToString())
             {
-                case "襯衫": selectingCloth = Cloth_shyatsu; break;
-                default: isChanged = false; break;
+                case "顯示": Cloth.Visibility = Visibility.Visible; break;
+                default: Cloth.Visibility = Visibility.Hidden; break;
             }
-            if (isChanged) selectingCloth.Visibility = Visibility.Visible;
-            else selectingCloth.Visibility = Visibility.Hidden;
+            
         }
 
         private void ComboForeground_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            bool isChanged = true;
-            selectingForeground.Visibility = Visibility.Hidden;
             switch (ComboForeground.SelectedItem.ToString())
             {
-                case "路邊攤": selectingForeground = Foreground_eggcake; break;
-                case "鳥居": selectingForeground = Foreground_torii; break;
-                case "直升機": selectingForeground = Foreground_heli; break;
-                default: isChanged = false; break;
+                case "路邊攤": Foreground_eggcake.Visibility = Visibility.Visible; break;
+                case "鳥居": Foreground_torii.Visibility = Visibility.Visible; break;
+                case "直升機": Foreground_heli.Visibility = Visibility.Visible; break;
+                default:
+                    {
+                        Foreground_eggcake.Visibility = Visibility.Hidden;
+                        Foreground_torii.Visibility = Visibility.Hidden;
+                        Foreground_heli.Visibility = Visibility.Hidden;
+                        break;
+                    }
             }
-            if (isChanged) selectingForeground.Visibility = Visibility.Visible;
-            else selectingForeground.Visibility = Visibility.Hidden;
         }
-
-
-        //Note : max height = 16000 , max width = 25000
-        //test for item go with mouse
-        /*
-        private void MainWindow_MouseMove(object sender , MouseEventArgs e)
-        {
-            Point p = e.GetPosition(BackgroundImage);
-            p_x.Text = p.X.ToString();
-            p_y.Text = p.Y.ToString();
-            double right = 23000 - p.X, bottom = 14000 - p.Y;
-            if (p.X < 0)
-            {
-                p.X = 0;
-                right = 23000;
-            }
-            if (p.Y < 0)
-            {
-                p.Y = 0;
-                bottom = 14000;
-            }
-            if (23000 < p.X)
-            {
-                p.X = 23000;
-                right = 0;
-            }
-            if (14000 < p.Y)
-            {
-                bottom = 0;
-                p.Y = 14000;
-            }
-            Item_photographer.Margin = new Thickness(p.X , p.Y , right , bottom);
-        }
-        */
 
         private void ComboItem_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            bool isChanged = true;
-            selectingItem.Visibility = Visibility.Hidden;
             switch (ComboItem.SelectedItem.ToString())
             {
-                case "相機": selectingItem = Item_photographer; break;
-                case "手提包": selectingItem = Item_bag; break;
-                default: isChanged = false; break;
+                case "相機": Item_photographer.Visibility = Visibility.Visible; break;
+                case "手提包": Item_bag.Visibility = Visibility.Visible; break;
+                default:
+                    {
+                        Item_photographer.Visibility = Visibility.Hidden;
+                        Item_bag.Visibility = Visibility.Hidden;
+                        break;
+                    }
             }
-            if (isChanged) selectingItem.Visibility = Visibility.Visible;
-            else selectingItem.Visibility = Visibility.Hidden;
         }
 
         private void ComboBoxInitialize()
@@ -614,12 +696,14 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             ComboItem.Items.Add("相機");
             ComboItem.Items.Add("手提包");
 
-            ComboCloth.Items.Add("襯衫");
+            ComboCloth.Items.Add("顯示");
+
+            ComboCountry.SelectedIndex = 0;
+            ComboItem.SelectedIndex = 0;
         }
 
         private void CountrySelectChanged()
         {
-            ComboItem.SelectedIndex = 0;
             ComboForeground.SelectedIndex = 0;
             ComboCloth.SelectedIndex = 0;
 
@@ -627,6 +711,7 @@ namespace Microsoft.Samples.Kinect.CoordinateMappingBasics
             ComboForeground.Items.Remove("鳥居");
             ComboForeground.Items.Remove("直升機");
         }
+
 
 
     }
